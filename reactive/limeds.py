@@ -13,19 +13,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#pylint:disable=c0301,c0103
+from charmhelpers.core import hookenv
 
-import pwd
-import os
-
-from subprocess import check_call
-
-from charmhelpers.core import hookenv, unitdata
-
-from charms.reactive import hook
 from charms.reactive import when, when_not
 from charms.reactive import set_state, remove_state, is_state
 
-@hook('config.changed')
+@when('config.changed')
 def reconfigure_docker_host():
     hookenv.log(hookenv.relation_get('dockerhost'))
     if is_state('dockerhost.available') and is_state('limeds.ready'):
@@ -33,11 +27,13 @@ def reconfigure_docker_host():
         hookenv.status_set('maintenance', 'Reconfiguring LimeDS [{}].'.format(conf.get('image')))
         remove_state('limeds.ready')
 
+
 @when_not('dockerhost.available')
 def no_host_connected():
     hookenv.status_set('blocked', 'Please connect the LimeDS charm to a docker host.')
     if is_state('limeds.ready'):
         remove_state('limeds.ready')
+
 
 @when('dockerhost.available')
 @when_not('limeds.ready')
@@ -45,30 +41,27 @@ def host_connected(dh):
     conf = hookenv.config()
     hookenv.log('configure_docker_host invoked for unit {}!!'.format(hookenv.local_unit()))
     hookenv.status_set('maintenance', 'Sending configuration to host.')
-    
-    name = hookenv.local_unit().replace("/","-")
+    name = hookenv.local_unit().replace("/", "-")
     ports = ['8080', '8443']
-    docker_host, docker_host_ports = dh.send_configuration(name, conf.get('image'), ports, conf.get('username'), \
-                                                           conf.get('secret'), True, True)
-    kv = unitdata.kv()
-    kv.set('docker_host', docker_host)
-    kv.set('docker_host_ports', docker_host_ports)
+    dh.send_configuration(name, conf.get('image'), ports, conf.get('username'), \
+                          conf.get('secret'), True, True)
+    hookenv.status_set('waiting', 'Waiting for image to come online.')
 
-    hookenv.log('The IP of the docker host is {}.'.format(docker_host))
 
-    hookenv.status_set('active', 'LimeDS [{}] ready.'.format(conf.get('image')))
+@when('dockerhost.ready')
+def image_running(dh):#pylint:disable=W0611,W0613
+    conf = hookenv.config()
+    hookenv.status_set('active', 'Ready. ({})'.format(conf.get('image')))
     set_state('limeds.ready')
-    
-@when('endpoint.available', 'limeds.ready')
-def configure_endpoint(endpoint):
-    #endpoint.configure(port=hookenv.config('http_port'))
-    kv = unitdata.kv()
-    docker_host = kv.get('docker_host')
-    docker_host_ports = kv.get('docker_host_ports')
+
+
+@when('endpoint.available', 'dockerhost.ready', 'limeds.ready')
+def configure_endpoint(endpoint, dh):
+    (docker_host, docker_host_ports) = dh.get_running_image()
     hookenv.log('The IP of the docker host is {}.'.format(docker_host))
     relation_info = {
         'hostname': docker_host,
+        'private-address': docker_host,
         'port': docker_host_ports['8080'],
     }
     endpoint.set_remote(**relation_info)
-
