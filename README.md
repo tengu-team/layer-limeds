@@ -26,6 +26,6 @@ Add relation between the docker engine and limeds
 
 Check the deployment status (press <kbd>ctrl</kbd>-<kbd>c</kbd> to exit)
 
-    watch juju status
+    watch -c juju status --color
 
 When the deployment is done ('active', 'Ready'), surf to `<ip>:<port>/editor` and login with admin:admin to see the management console.
