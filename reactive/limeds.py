@@ -110,18 +110,18 @@ def reset_client_relationship(limeds_server_relation):
 def wait_until_limeds_initialised(base_url):
     status_set('waiting', 'Waiting for LimeDS to complete initialisation.')
     deploy_url = "{limeds_url}/_limeds/installables"\
-                 "/{installable_id}/{installable_version}"\
-                 "/deploy".format(
+                 "/{installable_id}/{installable_version}".format(
                      limeds_url=base_url,
                      installable_id="org.ibcn.limeds.codecs.base64",
-                     installable_version="1.0.0")
+                     installable_version="latest")
     print("Waiting for LimeDS to complete initialisation.. This shouldn't take long.")
     print(deploy_url)
-    while True:
+    success = False
+    while not success:
         try:
-            response = requests.get(deploy_url)
+            response = requests.put(deploy_url)
             if response.status_code == 200:
-                break
+                success = True
             else:
                 print(response.status_code)
                 print(response.text)
@@ -129,14 +129,14 @@ def wait_until_limeds_initialised(base_url):
             print(err)
             print("retrying..")
         sys.stdout.flush()
-        sleep(1)
+        if not success:
+            sleep(1)
     print('LimeDS is initialised!')
 
 
 def get_deploy_url(self, installable_id, installable_version):
     deploy_url = "{limeds_url}/_limeds/installables"\
-                 "/{installable_id}/{installable_version}"\
-                 "/deploy".format(
+                 "/{installable_id}/{installable_version}".format(
                      limeds_url=self.base_url,
                      installable_id=installable_id,
                      installable_version=installable_version)
