@@ -1,2 +1,2 @@
-includes: ['layer:basic', 'interface:http', 'interface:docker-image-host', 'interface:limeds']
-repo: git@github.com:IBCNServices/layer-limeds.git
+includes: ['layer:docker-image', 'interface:http', 'interface:limeds']
+repo: git@github.com:tengu-team/layer-limeds.git

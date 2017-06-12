@@ -25,41 +25,13 @@ from charms.reactive import when, when_not, set_state, remove_state
 from charms.reactive.helpers import data_changed
 
 
-@when_not('dockerhost.available')
-def no_host_connected():
-    # Reset so that `data_changed` will return "yes" at next relation joined.
-    data_changed('image', None)
-    remove_state('limeds.ready')
-    status_set(
-        'blocked',
-        'Please connect the LimeDS charm to a docker host.')
-
-
-@when('dockerhost.available')
-def host_connected(dh_relation):
-    conf = hookenv.config()
-    if not data_changed('image', conf.get('image')):
-        print("same, skipping")
-        return
-    print("Different")
-    remove_state('limeds.ready')
-    log('config.changed.image, generating new UUID')
-    uuid = str(uuid4())
-    container_request = {
-        'image': conf.get('image'),
-    }
-    unitdata.kv().set('image', container_request)
-    dh_relation.send_container_requests({uuid: container_request})
-    status_set('waiting', 'Waiting for docker to spin up image.')
-
-
 @when('dockerhost.available')
 @when_not('limeds.ready')
-def image_running(dh_relation):
+def limeds_running(dh_relation):
     conf = hookenv.config()
     containers = dh_relation.get_running_containers()
     if containers:
-        for container in containers:
+        for unit, container in containers.items():
             wait_until_limeds_initialised('http://{}:{}'.format(
                 container['host'],
                 container['ports']['8080'], ))
@@ -109,9 +81,8 @@ def reset_client_relationship(limeds_server_relation):
 
 def wait_until_limeds_initialised(base_url):
     status_set('waiting', 'Waiting for LimeDS to complete initialisation.')
-    deploy_url = "{limeds_url}/_limeds/installables"\
-                 "/{installable_id}/{installable_version}".format(
-                     limeds_url=base_url,
+    deploy_url = get_deploy_url(
+                     base_url=base_url, 
                      installable_id="org.ibcn.limeds.codecs.base64",
                      installable_version="latest")
     print("Waiting for LimeDS to complete initialisation.. This shouldn't take long.")
@@ -134,10 +105,10 @@ def wait_until_limeds_initialised(base_url):
     print('LimeDS is initialised!')
 
 
-def get_deploy_url(self, installable_id, installable_version):
+def get_deploy_url(base_url, installable_id, installable_version):
     deploy_url = "{limeds_url}/_limeds/installables"\
                  "/{installable_id}/{installable_version}".format(
-                     limeds_url=self.base_url,
+                     limeds_url=base_url,
                      installable_id=installable_id,
                      installable_version=installable_version)
     return deploy_url
